@@ -2,94 +2,95 @@ import streamlit as st
 import pandas as pd
 import requests
 
-# --- CONFIGURACIÓN DE LA PÁGINA ---
-st.set_page_config(
-    page_title="ButacaVip Buscador",
-    page_icon="🔎",
-    layout="wide"
-)
+# 1. CONFIGURACIÓN
+st.set_page_config(page_title="ButacaVip Analytics", page_icon="📊", layout="wide")
 
-# --- TU CLAVE API (La llave maestra) ---
+# 2. TU CLAVE API
 API_KEY = "5c88939574e202d8432edcb638e08e10"
-BASE_URL = "https://image.tmdb.org/t/p/w500"  # Para las fotos
+BASE_URL = "https://image.tmdb.org/t/p/w500"
 
-# --- ESTILOS CSS (AZUL PROFESIONAL) ---
+# 3. ESTILO CSS (AZUL)
 st.markdown("""
 <style>
-    .stButton>button {
-        color: white;
-        background-color: #2E86C1;
-        border-color: #2E86C1;
-    }
-    .stTextInput>div>div>input {
-        color: #2E86C1;
-    }
+    .stButton>button { background-color: #2E86C1; color: white; border: none; }
+    .stMetric { background-color: #F0F2F6; padding: 10px; border-radius: 5px; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- TÍTULO ---
-st.title("🎬 ButacaVip: Buscador Global")
-st.markdown("Conectado a **The Movie Database (TMDB)** en tiempo real.")
-st.markdown("---")
+st.title("📊 ButacaVip: Analítica de Cine")
+st.markdown("Busca una saga (ej: *Harry Potter*, *Avengers*) y analiza sus datos.")
 
-# --- BARRA DE BÚSQUEDA ---
-col1, col2 = st.columns([3, 1])
+# 4. BUSCADOR
+col1, col2 = st.columns([4, 1])
 with col1:
-    busqueda = st.text_input("🔍 Escribe el nombre de una película:", placeholder="Ej: Matrix, Titanic, Batman...")
+    busqueda = st.text_input("Película o Saga:", placeholder="Escribe aquí...")
 with col2:
     st.write("")
-    st.write("") 
-    buscar_btn = st.button("Buscar Película 🚀", use_container_width=True)
+    st.write("")
+    buscar = st.button("Analizar 🚀", use_container_width=True)
 
-# --- LÓGICA DE BÚSQUEDA ---
-if busqueda or buscar_btn:
+if busqueda or buscar:
     if not busqueda:
-        st.warning("⚠️ Por favor, escribe algo para buscar.")
+        st.warning("⚠️ Escribe algo para buscar.")
     else:
         try:
-            # 1. CONECTAR CON LA API
+            # CONEXIÓN API
             url = f"https://api.themoviedb.org/3/search/movie?api_key={API_KEY}&query={busqueda}&language=es-ES"
-            respuesta = requests.get(url)
-            datos = respuesta.json()
+            res = requests.get(url).json()
 
-            # 2. VER SI HAY RESULTADOS
-            if datos['results']:
-                lista_pelis = datos['results']
-                st.success(f"✅ Se han encontrado {len(lista_pelis)} resultados para '{busqueda}'.")
+            if res['results']:
+                # --- PROCESAMIENTO DE DATOS CON PANDAS ---
+                df = pd.DataFrame(res['results'])
                 
-                # 3. MOSTRAR RESULTADOS EN REJILLA (GRID)
-                # Creamos columnas de 4 en 4
-                cols = st.columns(4)
-                for i, peli in enumerate(lista_pelis):
-                    # Solo mostramos las primeras 12 para no saturar
-                    if i >= 12: break
+                # Limpiamos datos: Quitamos las que no tienen fecha o nota
+                df['release_date'] = pd.to_datetime(df['release_date'], errors='coerce')
+                df = df.dropna(subset=['release_date', 'vote_average'])
+                df = df[df['vote_count'] > 10] # Quitamos pelis con pocos votos
+                df['year'] = df['release_date'].dt.year
+
+                # Ordenamos por fecha
+                df = df.sort_values(by='release_date')
+
+                # --- PESTAÑAS ---
+                tab_graficas, tab_lista = st.tabs(["📈 Análisis Gráfico", "🎬 Cartelera"])
+
+                with tab_graficas:
+                    # 1. KPIs (Indicadores Clave)
+                    mejor_peli = df.loc[df['vote_average'].idxmax()]
                     
-                    with cols[i % 4]:
-                        # Título
-                        st.markdown(f"### {peli['title']}")
-                        
-                        # Imagen (Si no tiene, ponemos una gris)
-                        if peli['poster_path']:
-                            img_url = BASE_URL + peli['poster_path']
-                            st.image(img_url, use_container_width=True)
-                        else:
-                            st.info("🖼️ Sin imagen disponible")
-                        
-                        # Datos
-                        st.caption(f"📅 Fecha: {peli.get('release_date', 'Desconocida')}")
-                        st.markdown(f"⭐ **Nota: {peli['vote_average']}/10**")
-                        
-                        # Sinopsis (con desplegable para no ocupar mucho)
-                        with st.expander("Leer Sinopsis"):
-                            st.write(peli['overview'] if peli['overview'] else "Sin descripción disponible.")
-                        
-                        st.markdown("---")
+                    c1, c2, c3 = st.columns(3)
+                    c1.metric("Películas Encontradas", len(df))
+                    c2.metric("Mejor Valorada", mejor_peli['title'], f"{mejor_peli['vote_average']} ⭐")
+                    c3.metric("Promedio de la Búsqueda", f"{round(df['vote_average'].mean(), 2)} / 10")
+                    
+                    st.divider()
+
+                    # 2. GRÁFICAS
+                    col_g1, col_g2 = st.columns(2)
+                    
+                    with col_g1:
+                        st.subheader("🏆 Ranking de Notas")
+                        # Gráfico de barras horizontal ordenado por nota
+                        df_sorted = df.sort_values(by='vote_average', ascending=True)
+                        st.bar_chart(df_sorted.set_index('title')['vote_average'], color="#2E86C1")
+                    
+                    with col_g2:
+                        st.subheader("📅 Evolución Temporal")
+                        # Gráfico de línea por año
+                        st.line_chart(df.set_index('year')['vote_average'], color="#2E86C1")
+                        st.caption("¿Las películas han mejorado o empeorado con los años?")
+
+                with tab_lista:
+                    st.subheader(f"Resultados para '{busqueda}'")
+                    cols = st.columns(4)
+                    for i, row in enumerate(df.itertuples()):
+                        with cols[i % 4]:
+                            if row.poster_path:
+                                st.image(BASE_URL + row.poster_path, use_container_width=True)
+                            st.write(f"**{row.title}**")
+                            st.caption(f"{row.year} | ⭐ {row.vote_average}")
             else:
-                st.error("❌ No se encontraron películas con ese nombre.")
+                st.error("No se encontraron resultados.")
 
         except Exception as e:
-            st.error(f"Error de conexión: {e}")
-
-# --- PIE DE PÁGINA ---
-st.markdown("---")
-st.markdown("Datos proporcionados por **TMDB**. Desarrollado por **Eduard289**.")
+            st.error(f"Error: {e}")
