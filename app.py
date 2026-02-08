@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 
@@ -12,19 +13,19 @@ st.set_page_config(
 st.title("🎬 ButacaVip: Centro de Datos")
 st.markdown("---")
 
-# 3. Datos (Enlace de imágenes arreglados y estables)
+# 3. Datos (¡Con enlaces de imágenes de Wikipedia, más estables!)
 data = {
     'Película': ['Avatar: El Sentido del Agua', 'Oppenheimer', 'Barbie', 'Dune: Parte 2', 'Godzilla x Kong', 'Super Mario Bros'],
     'Género': ['Ciencia Ficción', 'Drama', 'Comedia', 'Ciencia Ficción', 'Acción', 'Animación'],
     'Vistas': [2500, 3100, 2800, 2900, 1500, 2100],
     'Nota': [7.8, 8.9, 7.2, 9.0, 6.5, 7.5],
     'Poster': [
-        'https://image.tmdb.org/t/p/w500/t6HIqrRAclMCA60NsSmeqe9RmNV.jpg',
-        'https://image.tmdb.org/t/p/w500/ncKCQVXgk4BcQV6XbvesgZ2zGpZ.jpg',
-        'https://image.tmdb.org/t/p/w500/fNtqD4BTFj0Bgo9lyoAucFWtexd.jpg',
-        'https://image.tmdb.org/t/p/w500/czembW0Rk1Ke7lCJGahbOhdCuhV.jpg',
-        'https://image.tmdb.org/t/p/w500/z1p34vh7dEOnLDmyCrlUVLuoDzd.jpg',
-        'https://image.tmdb.org/t/p/w500/qNBAXBIQlnOThrVvA6mA2B5ggV6.jpg'
+        'https://image.tmdb.org/t/p/w500/t6HIqrRAclMCA60NsSmeqe9RmNV.jpg', # Avatar
+        'https://upload.wikimedia.org/wikipedia/en/4/4a/Oppenheimer_%28film%29.jpg', # Oppenheimer (Wikipedia)
+        'https://upload.wikimedia.org/wikipedia/en/0/0b/Barbie_2023_film_poster.jpg', # Barbie (Wikipedia)
+        'https://image.tmdb.org/t/p/w500/czembW0Rk1Ke7lCJGahbOhdCuhV.jpg', # Dune 2
+        'https://image.tmdb.org/t/p/w500/z1p34vh7dEOnLDmyCrlUVLuoDzd.jpg', # Godzilla
+        'https://upload.wikimedia.org/wikipedia/en/4/44/The_Super_Mario_Bros._Movie_poster.jpg' # Mario (Wikipedia)
     ]
 }
 df = pd.DataFrame(data)
@@ -44,9 +45,8 @@ df_filtrado = df[df['Género'].isin(genero_filtro)]
 tab1, tab2, tab3 = st.tabs(["📈 Estadísticas", "🖼️ Galería", "📋 Datos Crudos"])
 
 with tab1:
-    # Si no hay datos, mostramos aviso
     if df_filtrado.empty:
-        st.warning("⚠️ No hay datos para mostrar. Selecciona un género en el menú lateral.")
+        st.info("👈 Selecciona algún género en el menú lateral para ver datos.")
     else:
         col1, col2, col3 = st.columns(3)
         col1.metric("Películas Mostradas", len(df_filtrado))
@@ -54,23 +54,23 @@ with tab1:
         col3.metric("Nota Media", round(df_filtrado['Nota'].mean(), 1))
         
         st.subheader("Tendencias de Visualización")
-        # COLOR AZUL PROFESIONAL APLICADO AQUÍ
+        # Usamos el mismo azul profesional que configuraremos en el tema
         st.bar_chart(df_filtrado.set_index('Película')['Vistas'], color="#2E86C1")
 
 with tab2:
     st.subheader("Cartelera Actual")
-    
-    # PROTECCIÓN ANTI-ERROR: Si la lista está vacía, no intenta crear columnas
     if df_filtrado.empty:
-        st.info("👈 Selecciona algún género en la izquierda para ver las carátulas.")
+        st.info("👈 Selecciona algún género para ver las carátulas.")
     else:
-        # Creamos un máximo de 4 columnas para que no se vean diminutas si hay muchas
-        num_cols = len(df_filtrado)
-        if num_cols > 4: num_cols = 4
+        # Lógica para columnas dinámicas (evita errores y carátulas gigantes)
+        num_pelis = len(df_filtrado)
+        # Si hay pocas pelis (menos de 4), usamos tantas columnas como pelis haya.
+        # Si hay muchas, limitamos a 4 columnas máximo para que quede bien.
+        cols_to_use = num_pelis if num_pelis > 0 and num_pelis < 4 else 4
         
-        cols = st.columns(num_cols)
+        cols = st.columns(cols_to_use)
         for index, (i, row) in enumerate(df_filtrado.iterrows()):
-            col_actual = cols[index % num_cols]
+            col_actual = cols[index % cols_to_use]
             with col_actual:
                 st.image(row['Poster'], caption=row['Película'], use_container_width=True)
                 st.write(f"⭐ **{row['Nota']}**")
